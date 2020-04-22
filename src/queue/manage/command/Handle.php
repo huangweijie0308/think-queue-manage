@@ -43,7 +43,7 @@ class Handle extends Command
             ->addArgument('connection', Argument::OPTIONAL, 'The name of the queue connection to work', null)
             ->addOption('process', null, Option::VALUE_OPTIONAL, 'display All runing queue', 'false')
             ->addOption('display', null, Option::VALUE_OPTIONAL, 'Display information or not', 'true')
-            ->setDescription('queue manage');
+            ->setDescription('think-queue manage');
     }
 
     /**

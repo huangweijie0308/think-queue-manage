@@ -1,0 +1,30 @@
+{
+    "name": "huangweijie/think-queue-manage",
+    "description": "think-queue-manage",
+    "authors": [
+        {
+            "name": "huangweijie",
+            "email": "1539369355@qq.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "require": {
+        "topthink/framework": "^6.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "huangweijie\\queue\\": "src/queue"
+        }
+    },
+    "license": "MIT",
+    "extra": {
+        "think": {
+            "config": {
+                "crontab": "src/queue/config.php"
+            },
+            "services": [
+                "huangweijie\\queue\\manage\\Service"
+            ]
+        }
+    }
+}

@@ -1,0 +1,342 @@
+<?php
+/**
+ * Created by PhpStorm.
+ * User: Administrator
+ * Date: 2020/4/17 0017
+ * Time: 8:57
+ */
+
+namespace huangweijie\queue\manage\command;
+
+use think\console\Command;
+use think\console\Input;
+use think\console\Output;
+use think\console\input\Argument;
+use think\console\input\Option;
+
+class Handle extends Command
+{
+    /** @var null  */
+    private $think          = null;
+
+    /** @var int  */
+    private $handleStatus   = 0;
+
+    /** @var array  */
+    private $runQueues      = [];
+
+    /** @var array  */
+    private $stopQueues     = [];
+
+    /** @var array  */
+    private $startQueues    = [];
+
+    /** @var null  */
+    private $display        = null;
+
+    /** @var array  */
+    private $queues         = [];
+
+    protected function configure()
+    {
+        $this->setName('queue-manage:run')
+            ->addArgument('connection', Argument::OPTIONAL, 'The name of the queue connection to work', null)
+            ->addOption('process', null, Option::VALUE_OPTIONAL, 'display All runing queue', 'false')
+            ->addOption('display', null, Option::VALUE_OPTIONAL, 'Display information or not', 'true')
+            ->setDescription('queue manage');
+    }
+
+    /**
+     * Execute the console command.
+     * @param Input $input
+     * @param Output $output
+     * @return bool|int|null
+     */
+    protected function execute(Input $input, Output $output)
+    {
+        if (!$this->initEnv())
+            return true;
+
+        $connection = $input->getArgument('connection') ?: $this->app->config->get('queue.default');
+        $this->queues = $queues = $this->app->config->get("queue.connections.{$connection}.queues", []);
+        $displayRunting = (String)$input->getOption('process');
+        $this->display = (String)$input->getOption('display');
+
+        if ($displayRunting == 'true') {
+            $messages = $this->getRunQueueDetails();
+            $messages = empty($messages)? 'No running queue': $messages;
+            $this->writeMessage(100, $messages);
+            return true;
+        }
+
+        if (empty($connection))
+            return true;
+
+        $this->cheakOptions();
+        $this->runQueues = $this->getRunQueue();
+
+        foreach ($this->runQueues as $runQueue) {
+            $processNum = $this->queueProcessNum($runQueue)?? 0;
+            $processNum = intval($processNum);
+            $pids = $this->getProcessPids($runQueue);
+
+            if (array_key_exists($runQueue, $queues)) {
+                $setprocessNum = empty($queues[$runQueue]['processNum'])? 0: intval($queues[$runQueue]['processNum']);
+                if ($processNum != $setprocessNum) {
+                    $diffNum = abs($setprocessNum - $processNum);
+                    $processNum > $setprocessNum? $this->addStopQueues($pids, $diffNum, $runQueue): $this->addStartQueues($runQueue, $diffNum);
+                }
+
+                unset($queues[$runQueue]);
+                continue;
+            }
+
+            $this->addStopQueues($pids, $processNum, $runQueue);
+        }
+
+        foreach ($queues as $queue => $parameter) {
+            $setprocessNum = empty($parameter['processNum'])? 0: intval($parameter['processNum']);
+            $this->addStartQueues($queue, $setprocessNum);
+        }
+
+        $this->startMore($this->startQueues);
+        $this->stopMore($this->stopQueues);
+        $this->writeMessage($this->handleStatus);
+
+        return true;
+    }
+
+    /**
+     * @param $status
+     * @param string $messages
+     */
+    private function writeMessage($status, $messages = '')
+    {
+        if ($this->display == 'false')
+            return;
+
+        switch($status){
+            case 200:
+                if (!empty($this->startQueues)) {
+                    $this->output->writeln('[Success]:start queue list:');
+                    $this->output->writeln('queue number');
+                    foreach ($this->startQueues as $item){
+                        $this->output->writeln($item['queue'] . ' ' . $item['startNum']);
+                    }
+                }
+
+                if (!empty($this->stopQueues)) {
+                    $this->output->writeln('[Success]:stop queue list:');
+                    $this->output->writeln('queue number pids');
+                    foreach ($this->stopQueues as $item){
+                        $this->output->writeln($item['queue'] . ' ' . $item['stopNum'] . ' ' .join(' ', $item['pids']));
+                    }
+                }
+                break;
+            case 100:
+                $this->output->writeln($messages);
+                break;
+            default:
+                $this->output->writeln('[Info]:nothing');
+                break;
+        }
+    }
+
+    /**
+     * @return bool
+     */
+    private function initEnv()
+    {
+        if (strtoupper(PHP_OS ) !== 'LINUX') {
+            $this->writeMessage(100,'[Warning]:Windows is not supported');
+            return false;
+        }
+
+        $this->think = $this->app->getRootPath() . 'think';
+        return true;
+    }
+
+    /**
+     * @return string
+     */
+    private function getRunQueueDetails()
+    {
+        return shell_exec("ps -ef|grep 'think queue:work --queue='|grep -v 'grep'|grep -v $$");
+    }
+
+    /**
+     * 检查队列选项是否有变化
+     */
+    private function cheakOptions()
+    {
+        $queues = $this->getRunQueueDetails();
+        $queues = explode(PHP_EOL, $queues);
+
+        reset($queues);
+        while($queue = current($queues)) {
+            next($queues);
+            $queueOptions = explode(' ', preg_replace("/\s+/"," ", $queue));
+
+            if (count($queueOptions) > 10) {
+                $currentQueue = str_replace('--queue=', '', $queueOptions[10]);
+                $currentPid = $queueOptions[1];
+                $setOptions = $this->queues[$currentQueue]?? [];
+
+                $queueOptions = array_slice($queueOptions,11);
+                foreach ($queueOptions as $index => $option) {
+                    $currentOption = explode('=', str_replace('--', '', $option));
+                    unset($queueOptions[$index]);
+                    $queueOptions[$currentOption[0]] = (int)$currentOption[1];
+                }
+
+                $allowOption = ['delay' => 0, 'sleep' => 3, 'tries' => 0, 'memory' => 128, 'timeout' => 60];
+                $setOptions = array_merge($allowOption, $setOptions);
+                foreach ($setOptions as $setOption => $optionValue) {
+                    if (array_key_exists($setOption, $allowOption) && (!in_array($setOption, $queueOptions) || $queueOptions[$setOption] != $optionValue)) {
+                        $this->stopOnce($currentPid);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * @return array
+     */
+    private function getRunQueue()
+    {
+        $queues = shell_exec("ps -ef|grep 'think queue:work --queue='|grep -v 'grep'|grep -v $$|awk '{print $11}'");
+        $queues = explode(PHP_EOL, $queues);
+
+        foreach ($queues as $index => &$queue) {
+            if (empty($queue)) {
+                unset($queues[$index]);
+                continue;
+            }
+
+            $queue = str_replace('--queue=', '', $queue);
+            unset($queue);
+        }
+
+        return array_unique($queues);
+    }
+
+    /**
+     * @param $queue
+     * @return array|string
+     */
+    private function getProcessPids($queue)
+    {
+        $pids = shell_exec("ps -ef|grep 'think queue:work --queue={$queue}'|grep -v 'grep'|grep -v $$|awk '{print $2}'");
+        $pids = explode(PHP_EOL, $pids);
+
+        foreach ($pids as $index => $pid) {
+            if (empty($pid))
+                unset($pids[$index]);
+        }
+
+        return $pids;
+    }
+
+    /**
+     * @param $queue
+     * @return string
+     */
+    private function queueProcessNum($queue)
+    {
+        return shell_exec("ps -ef|grep 'think queue:work --queue={$queue}'|grep -v grep|wc -l");
+    }
+
+    /**
+     * @param $queue
+     */
+    private function startOnce($queue)
+    {
+        $queueOption = $this->queues[$queue]?? [];
+        $command = "nohup php {$this->think} queue:work --queue={$queue}";
+        $allowOption = ['delay' => 0, 'sleep' => 3, 'tries' => 0, 'memory' => 128, 'timeout' => 60];
+
+        $queueOption = array_merge($allowOption, $queueOption);
+        foreach ($queueOption as $option => $optionValue) {
+            if (array_key_exists($option, $allowOption)) {
+                $optionValue = (int)$optionValue;
+                $command .= " --{$option}={$optionValue}";
+            }
+        }
+
+        $command = trim($command);
+        shell_exec("{$command} >/dev/null 2>&1 &");
+    }
+
+    /**
+     * @param array $startList
+     */
+    private function startMore(Array $startList)
+    {
+        foreach ($startList as $item) {
+            $queue = $item['queue'];
+            $number = empty($item['startNum'])? 0: intval($item['startNum']);
+
+            while($number != 0) {
+                $this->startOnce($queue);
+                --$number;
+            }
+        }
+    }
+
+    /**
+     * @param $pid
+     */
+    private function stopOnce($pid)
+    {
+        shell_exec("kill -9 $pid");
+    }
+
+    private function stopMore(Array $stopList)
+    {
+        foreach ($stopList as $item) {
+            $pids = $item['pids']?: [];
+            $stopNum = empty($item['stopNum'])? 0: intval($item['stopNum']);
+
+            reset($pids);
+            while($stopNum && $pid = current($pids)) {
+                $this->stopOnce($pid);
+                next($pids);
+                --$stopNum;
+            }
+        }
+    }
+
+    /**
+     * @param $queue
+     * @param $startNum
+     */
+    private function addStartQueues($queue, $startNum)
+    {
+        if ($startNum > 0) {
+            $this->handleStatus = 200;
+            $this->startQueues[] = [
+                'queue'  => $queue,
+                'startNum' => intval($startNum)
+            ];
+        }
+    }
+
+    /**
+     * @param array $pids
+     * @param int $stopNum
+     * @param string $queue
+     */
+    private function addStopQueues(Array $pids, $stopNum = 0, $queue = '')
+    {
+        if ($stopNum > 0) {
+            $this->handleStatus = 200;
+            $this->stopQueues[] = [
+                'pids'    => $pids,
+                'stopNum' => intval($stopNum),
+                'queue'   => $queue
+            ];
+        }
+    }
+}

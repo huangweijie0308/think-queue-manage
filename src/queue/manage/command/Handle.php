@@ -110,6 +110,9 @@ class Handle extends Command
         }
 
         foreach ($queues as $queue => $parameter) {
+            if (empty($queue) || !is_string($queue))
+                continue;
+
             $setprocessNum = empty($parameter['processNum'])? 0: intval($parameter['processNum']);
             $this->addStartQueues($queue, $setprocessNum);
         }

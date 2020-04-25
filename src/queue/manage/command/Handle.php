@@ -37,6 +37,9 @@ class Handle extends Command
     /** @var array  */
     private $queues         = [];
 
+    /** @var bool  */
+    private $able           = true;
+
     protected function configure()
     {
         $this->setName('think-queue-manage:handle')
@@ -44,6 +47,18 @@ class Handle extends Command
             ->addOption('process', null, Option::VALUE_OPTIONAL, 'display All runing queue', 'false')
             ->addOption('display', null, Option::VALUE_OPTIONAL, 'Display information or not', 'true')
             ->setDescription('think queue manage:handle');
+    }
+
+    protected function initialize(Input $input, Output $output)
+    {
+
+        if (strtoupper(PHP_OS ) == 'LINUX') {
+            $this->think = $this->app->getRootPath() . 'think';
+            return;
+        }
+
+        $this->able = false;
+        $this->writeMessage(100,'[Warning]:Windows is not supported');
     }
 
     /**
@@ -54,8 +69,8 @@ class Handle extends Command
      */
     protected function execute(Input $input, Output $output)
     {
-        if (!$this->initEnv())
-            return true;
+        if (!$this->able)
+            return;
 
         $connection = $input->getArgument('connection') ?: $this->app->config->get('queue.default');
         $this->queues = $queues = $this->app->config->get("queue.connections.{$connection}.queues", []);
@@ -140,20 +155,6 @@ class Handle extends Command
                 $this->output->writeln('[Info]:nothing');
                 break;
         }
-    }
-
-    /**
-     * @return bool
-     */
-    private function initEnv()
-    {
-        if (strtoupper(PHP_OS ) !== 'LINUX') {
-            $this->writeMessage(100,'[Warning]:Windows is not supported');
-            return false;
-        }
-
-        $this->think = $this->app->getRootPath() . 'think';
-        return true;
     }
 
     /**

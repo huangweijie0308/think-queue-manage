@@ -39,11 +39,11 @@ class Handle extends Command
 
     protected function configure()
     {
-        $this->setName('queue-manage:run')
+        $this->setName('think-queue-manage:handle')
             ->addArgument('connection', Argument::OPTIONAL, 'The name of the queue connection to work', null)
             ->addOption('process', null, Option::VALUE_OPTIONAL, 'display All runing queue', 'false')
             ->addOption('display', null, Option::VALUE_OPTIONAL, 'Display information or not', 'true')
-            ->setDescription('think-queue manage');
+            ->setDescription('think queue manage:handle');
     }
 
     /**

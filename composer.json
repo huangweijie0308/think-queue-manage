@@ -21,7 +21,7 @@
     "extra": {
         "think": {
             "config": {
-                "crontab": "src/queue/config.php"
+                "queue": "src/queue/config.php"
             },
             "services": [
                 "huangweijie\\queue\\manage\\Service"

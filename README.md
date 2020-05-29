@@ -13,7 +13,7 @@ composer require huangweijie/think-queue-manage
 配置
 
 ```
-项目根目录/vendor/huangweijie/think-queue-manage/src/config.php
+项目根目录/config/queue.php
 <?php
 
 return [

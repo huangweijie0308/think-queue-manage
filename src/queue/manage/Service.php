@@ -1,10 +1,9 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: Administrator
- * Date: 2020/4/22 0022
- * Time: 14:49
- */
+// +----------------------------------------------------------------------
+// | Licensed ( http://www.apache.org/licenses/LICENSE-2.0 )
+// +----------------------------------------------------------------------
+// | Author: huangweijie <1539369355@qq.com>
+// +----------------------------------------------------------------------
 
 namespace huangweijie\queue\manage;
 

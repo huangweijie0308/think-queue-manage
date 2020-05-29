@@ -1,10 +1,9 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: Administrator
- * Date: 2020/4/17 0017
- * Time: 8:57
- */
+// +----------------------------------------------------------------------
+// | Licensed ( http://www.apache.org/licenses/LICENSE-2.0 )
+// +----------------------------------------------------------------------
+// | Author: huangweijie <1539369355@qq.com>
+// +----------------------------------------------------------------------
 
 namespace huangweijie\queue\manage\command;
 
@@ -49,6 +48,10 @@ class Handle extends Command
             ->setDescription('think queue manage:handle');
     }
 
+    /**
+     * @param Input $input
+     * @param Output $output
+     */
     protected function initialize(Input $input, Output $output)
     {
 
@@ -125,6 +128,7 @@ class Handle extends Command
     }
 
     /**
+     * 输出消息
      * @param $status
      * @param string $messages
      */
@@ -161,6 +165,7 @@ class Handle extends Command
     }
 
     /**
+     * 获取正在运行的队列进程详情
      * @return string
      */
     private function getRunQueueDetails()
@@ -170,6 +175,7 @@ class Handle extends Command
 
     /**
      * 检查队列选项是否有变化
+     * @return bool
      */
     private function cheakOptions()
     {
@@ -203,9 +209,12 @@ class Handle extends Command
                 }
             }
         }
+
+        return true;
     }
 
     /**
+     * 获取正在运行的队列名称
      * @return array
      */
     private function getRunQueue()
@@ -227,6 +236,7 @@ class Handle extends Command
     }
 
     /**
+     * 获取指定队列名称的进程pid
      * @param $queue
      * @return array|string
      */
@@ -244,6 +254,7 @@ class Handle extends Command
     }
 
     /**
+     * 获取指定队列名称的进程数
      * @param $queue
      * @return string
      */
@@ -253,6 +264,7 @@ class Handle extends Command
     }
 
     /**
+     * 开启一个队列进程
      * @param $queue
      */
     private function startOnce($queue)
@@ -274,6 +286,7 @@ class Handle extends Command
     }
 
     /**
+     * 开启多个队列进程
      * @param array $startList
      */
     private function startMore(Array $startList)
@@ -290,6 +303,7 @@ class Handle extends Command
     }
 
     /**
+     * kill一个队列进程
      * @param $pid
      */
     private function stopOnce($pid)

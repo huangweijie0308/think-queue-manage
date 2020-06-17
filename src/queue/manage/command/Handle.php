@@ -170,6 +170,25 @@ class Handle extends Command
      */
     private function getRunQueueDetails()
     {
+        $processList = shell_exec("ps -eo pid,etime,stat,cmd | grep 'think queue:work --queue='|grep -v 'grep'|grep -v $$");
+        $processList = explode(PHP_EOL, $processList);
+        $processList = is_array($processList)? $processList: [];
+        foreach ($processList as $process) {
+            if (empty($process)) {
+                continue;
+            }
+
+            $processAttr = explode(' ', preg_replace("/\s+/"," ", trim($process)));
+            $processStat = strtoupper($processAttr[2][0]);
+            $etime = (int)date('H', strtotime(str_pad($processAttr[1], 8, '00:', STR_PAD_LEFT)));
+
+            // T:停止,Z:僵尸,X:死掉 || 超时
+            if (in_array($processStat, ['T', 'Z', 'X']) || $etime >= 1) {
+                $pid = &$processAttr[0];
+                $this->stopOnce($pid);
+            }
+        }
+
         return shell_exec("ps -ef|grep 'think queue:work --queue='|grep -v 'grep'|grep -v $$");
     }
 
@@ -185,7 +204,7 @@ class Handle extends Command
         reset($queues);
         while($queue = current($queues)) {
             next($queues);
-            $queueOptions = explode(' ', preg_replace("/\s+/"," ", $queue));
+            $queueOptions = explode(' ', preg_replace("/\s+/"," ", trim($queue)));
 
             if (count($queueOptions) > 10) {
                 $currentQueue = str_replace('--queue=', '', $queueOptions[10]);

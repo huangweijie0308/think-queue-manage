@@ -165,6 +165,19 @@ class Handle extends Command
     }
 
     /**
+     * 获取指定进程运行的时间(秒)
+     * @param $pid
+     * @return int
+     */
+    private function getProcessExeTime($pid)
+    {
+        $userHz = (int)shell_exec("getconf CLK_TCK");
+        $sysUptime = (int)shell_exec("cat /proc/uptime | cut -d\" \" -f1");
+        $pidUptime = (int)shell_exec("cat /proc/{$pid}/stat | cut -d\" \" -f22");
+        return (int)($sysUptime - ($pidUptime / $userHz));
+    }
+
+    /**
      * 获取正在运行的队列进程详情
      * @return string
      */
@@ -179,12 +192,11 @@ class Handle extends Command
             }
 
             $processAttr = explode(' ', preg_replace("/\s+/"," ", trim($process)));
-            $processStat = strtoupper($processAttr[2][0]);
-            $etime = (int)date('H', strtotime(str_pad($processAttr[1], 8, '00:', STR_PAD_LEFT)));
+            $processStat = strtoupper($processAttr[2]{0});
+            $pid = $processAttr[0];
 
             // T:停止,Z:僵尸,X:死掉 || 超时
-            if (in_array($processStat, ['T', 'Z', 'X']) || $etime >= 1) {
-                $pid = &$processAttr[0];
+            if (in_array($processStat, ['T', 'Z', 'X'])) {
                 $this->stopOnce($pid);
             }
         }
@@ -220,10 +232,19 @@ class Handle extends Command
 
                 $allowOption = ['delay' => 0, 'sleep' => 3, 'tries' => 0, 'memory' => 128, 'timeout' => 60];
                 $setOptions = array_merge($allowOption, $setOptions);
-                foreach ($setOptions as $setOption => $optionValue) {
-                    if (array_key_exists($setOption, $allowOption) && (!in_array($setOption, $queueOptions) || $queueOptions[$setOption] != $optionValue)) {
-                        $this->stopOnce($currentPid);
-                        break;
+
+                // 判断进程是否超时
+                $processTimeout = empty($setOptions['processTimeout'])? 3600: (int)$setOptions['processTimeout'];
+                $costTime = $this->getProcessExeTime($currentPid);
+                if ($costTime >= $processTimeout) {
+                    $this->stopOnce($currentPid);
+                } else {
+                    // 判断队列设置选项是否发生改变
+                    foreach ($setOptions as $setOption => $optionValue) {
+                        if (array_key_exists($setOption, $allowOption) && (!array_key_exists($setOption, $queueOptions) || $queueOptions[$setOption] != $optionValue)) {
+                            $this->stopOnce($currentPid);
+                            break;
+                        }
                     }
                 }
             }

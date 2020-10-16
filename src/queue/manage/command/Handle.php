@@ -237,7 +237,7 @@ class Handle extends Command
                 $processTimeout = empty($setOptions['processTimeout'])? 3600: (int)$setOptions['processTimeout'];
                 $costTime = $this->getProcessExeTime($currentPid);
                 if ($costTime >= $processTimeout) {
-                    $this->stopOnce($currentPid);
+                    $this->softStopOnce($currentPid);
                 } else {
                     // 判断队列设置选项是否发生改变
                     foreach ($setOptions as $setOption => $optionValue) {
@@ -349,6 +349,15 @@ class Handle extends Command
     private function stopOnce($pid)
     {
         shell_exec("kill -9 $pid");
+    }
+
+    /**
+     * kill一个队列进程
+     * @param $pid
+     */
+    private function softStopOnce($pid)
+    {
+        shell_exec("kill -15 $pid");
     }
 
     private function stopMore(Array $stopList)

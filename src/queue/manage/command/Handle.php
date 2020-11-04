@@ -242,7 +242,7 @@ class Handle extends Command
                     // 判断队列设置选项是否发生改变
                     foreach ($setOptions as $setOption => $optionValue) {
                         if (array_key_exists($setOption, $allowOption) && (!array_key_exists($setOption, $queueOptions) || $queueOptions[$setOption] != $optionValue)) {
-                            $this->stopOnce($currentPid);
+                            $this->softStopOnce($currentPid);
                             break;
                         }
                     }
@@ -368,7 +368,7 @@ class Handle extends Command
 
             reset($pids);
             while($stopNum && $pid = current($pids)) {
-                $this->stopOnce($pid);
+                $this->softStopOnce($pid);
                 next($pids);
                 --$stopNum;
             }

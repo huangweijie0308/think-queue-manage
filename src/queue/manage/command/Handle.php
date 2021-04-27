@@ -234,9 +234,9 @@ class Handle extends Command
                 $setOptions = array_merge($allowOption, $setOptions);
 
                 // 判断进程是否超时
-                $processTimeout = empty($setOptions['processTimeout'])? 3600: (int)$setOptions['processTimeout'];
+                $processTimeout = isset($setOptions['processTimeout'])? (int)$setOptions['processTimeout']: 0;
                 $costTime = $this->getProcessExeTime($currentPid);
-                if ($costTime >= $processTimeout) {
+                if ($processTimeout && $costTime >= $processTimeout) {
                     $this->softStopOnce($currentPid);
                 } else {
                     // 判断队列设置选项是否发生改变
